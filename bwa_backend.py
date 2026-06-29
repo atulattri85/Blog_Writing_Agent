@@ -67,7 +67,7 @@ class RouterDecision(BaseModel):
     mode: Literal["closed_book", "hybrid", "open_book"]
     reason: str
     queries: List[str] = Field(default_factory=list)
-    max_results_per_query: int = Field(5)
+    max_results_per_query: int = Field(1)
 
 
 class EvidencePack(BaseModel):
