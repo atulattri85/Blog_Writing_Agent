@@ -5,6 +5,7 @@ python-dotenv==1.1.1
 langchain==0.3.27
 langchain-core==0.3.72
 langchain-community
+google-genai
 langchain-openai==0.3.28
 langchain-google-genai==2.0.10
 sentence-transformers
@@ -23,3 +24,9 @@ pypdf
 requests==2.32.4
 
 duckduckgo-search
+
+pydantic>=2.7,<3
+tavily-python
+pandas
+pillow
+markdown

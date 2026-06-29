@@ -12,11 +12,15 @@ from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
+
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
 
 load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY") or st.secrets.get("TAVILY_API_KEY")
 
 # ============================================================
 # Blog Writer (Router → (Research?) → Orchestrator → Workers → ReducerWithImages)
@@ -113,7 +117,7 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatOpenAI(model="gpt-4.1-mini")
+llm = ChatGroq(model="openai/gpt-oss-20b", streaming=True, api_key=GROQ_API_KEY)
 
 # -----------------------------
 # 3) Router
@@ -162,11 +166,11 @@ def route_next(state: State) -> str:
 # 4) Research (Tavily)
 # -----------------------------
 def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
-    if not os.getenv("TAVILY_API_KEY"):
+    if not TAVILY_API_KEY:
         return []
     try:
         from langchain_community.tools.tavily_search import TavilySearchResults  # type: ignore
-        tool = TavilySearchResults(max_results=max_results)
+        tool = TavilySearchResults(max_results=max_results, tavily_api_key=TAVILY_API_KEY)
         results = tool.invoke({"query": query})
         out: List[dict] = []
         for r in results or []:
@@ -434,11 +438,10 @@ def _gemini_generate_image_bytes(prompt: str) -> bytes:
     from google import genai
     from google.genai import types
 
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
+    if not GOOGLE_API_KEY:
         raise RuntimeError("GOOGLE_API_KEY is not set.")
 
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=GOOGLE_API_KEY)
 
     resp = client.models.generate_content(
         model="gemini-2.5-flash-image",
