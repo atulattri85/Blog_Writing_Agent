@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TypedDict, List, Optional, Literal, Annotated
 
 from pydantic import BaseModel, Field
+from langchain.agents.structured_output import ToolStrategy
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
@@ -137,7 +138,7 @@ If needs_research=true:
 """
 
 def router_node(state: State) -> dict:
-    decider = llm.with_structured_output(RouterDecision, method="json_schema")
+    decider = llm.with_structured_output(RouterDecision, method=ToolStrategy)
     decision = decider.invoke(
         [
             SystemMessage(content=ROUTER_SYSTEM),
@@ -216,7 +217,7 @@ def research_node(state: State) -> dict:
     if not raw:
         return {"evidence": []}
 
-    extractor = llm.with_structured_output(EvidencePack, method="json_schema")
+    extractor = llm.with_structured_output(EvidencePack, method=ToolStrategy)
     pack = extractor.invoke(
         [
             SystemMessage(content=RESEARCH_SYSTEM),
@@ -265,7 +266,7 @@ Output must match Plan schema.
 """
 
 def orchestrator_node(state: State) -> dict:
-    planner = llm.with_structured_output(Plan, method="json_schema")
+    planner = llm.with_structured_output(Plan, method=ToolStrategy)
     mode = state.get("mode", "closed_book")
     evidence = state.get("evidence", [])
 
@@ -404,7 +405,7 @@ Return strictly GlobalImagePlan.
 """
 
 def decide_images(state: State) -> dict:
-    planner = llm.with_structured_output(GlobalImagePlan, method="json_schema")
+    planner = llm.with_structured_output(GlobalImagePlan, method=ToolStrategy)
     merged_md = state["merged_md"]
     plan = state["plan"]
     assert plan is not None
