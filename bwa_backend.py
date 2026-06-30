@@ -137,7 +137,7 @@ If needs_research=true:
 """
 
 def router_node(state: State) -> dict:
-    decider = llm.with_structured_output(RouterDecision)
+    decider = llm.with_structured_output(RouterDecision, method="json_schema")
     decision = decider.invoke(
         [
             SystemMessage(content=ROUTER_SYSTEM),
@@ -216,7 +216,7 @@ def research_node(state: State) -> dict:
     if not raw:
         return {"evidence": []}
 
-    extractor = llm.with_structured_output(EvidencePack)
+    extractor = llm.with_structured_output(EvidencePack, method="json_schema")
     pack = extractor.invoke(
         [
             SystemMessage(content=RESEARCH_SYSTEM),
@@ -265,7 +265,7 @@ Output must match Plan schema.
 """
 
 def orchestrator_node(state: State) -> dict:
-    planner = llm.with_structured_output(Plan)
+    planner = llm.with_structured_output(Plan, method="json_schema")
     mode = state.get("mode", "closed_book")
     evidence = state.get("evidence", [])
 
@@ -404,7 +404,7 @@ Return strictly GlobalImagePlan.
 """
 
 def decide_images(state: State) -> dict:
-    planner = llm.with_structured_output(GlobalImagePlan)
+    planner = llm.with_structured_output(GlobalImagePlan, method="json_schema")
     merged_md = state["merged_md"]
     plan = state["plan"]
     assert plan is not None
