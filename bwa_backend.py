@@ -117,7 +117,7 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatGroq(model="groq/compound", streaming=True, api_key=GROQ_API_KEY)
+llm = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", streaming=True, api_key=GROQ_API_KEY)
 
 # -----------------------------
 # 3) Router
