@@ -117,7 +117,7 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatGroq(model="openai/gpt-oss-20b", streaming=True, api_key=GROQ_API_KEY)
+llm = ChatGroq(model="groq/compound", streaming=True, api_key=GROQ_API_KEY)
 
 # -----------------------------
 # 3) Router
