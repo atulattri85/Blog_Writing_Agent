@@ -7,13 +7,15 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import TypedDict, List, Optional, Literal, Annotated
 
-from pydantic import BaseModel, Field
-from langchain.agents.structured_output import ToolStrategy
+from pydantic import BaseModel, Field, ConfigDict
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
@@ -22,6 +24,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY") or st.secrets.get("TAVILY_API_KEY")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY") or st.secrets.get("NVIDIA_API_KEY")
 
 # ============================================================
 # Blog Writer (Router → (Research?) → Orchestrator → Workers → ReducerWithImages)
@@ -64,11 +67,13 @@ class EvidenceItem(BaseModel):
 
 
 class RouterDecision(BaseModel):
+    model_config = ConfigDict(strict=False)
+
     needs_research: bool
     mode: Literal["closed_book", "hybrid", "open_book"]
     reason: str
     queries: List[str] = Field(default_factory=list)
-    max_results_per_query: int = Field(5)
+    max_results_per_query: int = Field(2)
 
 
 class EvidencePack(BaseModel):
@@ -118,7 +123,24 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", streaming=True, api_key=GROQ_API_KEY)
+# llm = ChatGroq(model="", streaming=True, api_key=GROQ_API_KEY)
+# llm = ChatGroq(
+#     model="groq/compound-mini",
+#     api_key=GROQ_API_KEY,
+#     streaming=True,
+# )
+# llm = ChatGoogleGenerativeAI(
+#     model="gemini-3.5-flash",
+#     google_api_key=GOOGLE_API_KEY,
+#     temperature=0,
+# )
+
+llm = ChatOpenAI(
+    model="nvidia/nemotron-3-super-120b-a12b",
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=NVIDIA_API_KEY,
+    temperature=0,
+)
 
 # -----------------------------
 # 3) Router
@@ -133,18 +155,20 @@ Modes:
 - open_book (needs_research=true): volatile weekly/news/"latest"/pricing/policy.
 
 If needs_research=true:
-- Output 3–10 high-signal, scoped queries.
+- Output 1 high-signal, scoped queries.
 - For open_book weekly roundup, include queries reflecting last 7 days.
 """
 
 def router_node(state: State) -> dict:
-    decider = llm.with_structured_output(RouterDecision, method=ToolStrategy)
+    decider = llm.with_structured_output(RouterDecision)
     decision = decider.invoke(
         [
             SystemMessage(content=ROUTER_SYSTEM),
             HumanMessage(content=f"Topic: {state['topic']}\nAs-of date: {state['as_of']}"),
         ]
     )
+    decision.needs_research = bool(decision.needs_research)
+    decision.max_results_per_query = int(decision.max_results_per_query)
 
     if decision.mode == "open_book":
         recency_days = 7
@@ -217,7 +241,7 @@ def research_node(state: State) -> dict:
     if not raw:
         return {"evidence": []}
 
-    extractor = llm.with_structured_output(EvidencePack, method=ToolStrategy)
+    extractor = llm.with_structured_output(EvidencePack)
     pack = extractor.invoke(
         [
             SystemMessage(content=RESEARCH_SYSTEM),
@@ -266,7 +290,7 @@ Output must match Plan schema.
 """
 
 def orchestrator_node(state: State) -> dict:
-    planner = llm.with_structured_output(Plan, method=ToolStrategy)
+    planner = llm.with_structured_output(Plan)
     mode = state.get("mode", "closed_book")
     evidence = state.get("evidence", [])
 
@@ -405,7 +429,7 @@ Return strictly GlobalImagePlan.
 """
 
 def decide_images(state: State) -> dict:
-    planner = llm.with_structured_output(GlobalImagePlan, method=ToolStrategy)
+    planner = llm.with_structured_output(GlobalImagePlan)
     merged_md = state["merged_md"]
     plan = state["plan"]
     assert plan is not None
